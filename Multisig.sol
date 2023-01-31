@@ -19,9 +19,10 @@ contract MultiSigWallet {
     uint public numConfirmationsRequired;
 
     struct Transaction {
-        address to;
+        address target;
         uint value;
-        bytes data;
+        string func ;
+        bytes data ; 
         bool executed;
         uint numConfirmations;
     }
@@ -77,28 +78,30 @@ contract MultiSigWallet {
     }
 
     function submitTransaction(
-        address _to,
+        address _target,
         uint _value,
-        bytes memory _data
+       string calldata _func,
+        bytes calldata _data
     ) public onlyOwner {
         uint txIndex = transactions.length;
-
         transactions.push(
             Transaction({
-                to: _to,
+                target: _target,
                 value: _value,
+                func : _func,
                 data: _data,
                 executed: false,
                 numConfirmations: 0
             })
         );
 
-        emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
+        emit SubmitTransaction(msg.sender, txIndex, _target, _value, _data);
     }
 
     function confirmTransaction(
         uint _txIndex
     ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
+        require(isConfirmed[_txIndex][msg.sender] = false,"aldready confirmed by the user");
         Transaction storage transaction = transactions[_txIndex];
         transaction.numConfirmations += 1;
         isConfirmed[_txIndex][msg.sender] = true;
@@ -117,10 +120,18 @@ contract MultiSigWallet {
         );
 
         transaction.executed = true;
+         // prepare data
+        bytes memory data;
+        if (bytes(transaction.func).length > 0) {
+            // data = func selector + _data
+            data = abi.encodePacked(bytes4(keccak256(bytes(transaction.func))),transaction.data);
+        } else {
+            // call fallback with data
+            data = transaction.data;
+        }
 
-        (bool success, ) = transaction.to.call{value: transaction.value}(
-            transaction.data
-        );
+        // call target
+        (bool success, ) = transaction.target.call{value: transaction.value}(data);
         require(success, "tx failed");
 
         emit ExecuteTransaction(msg.sender, _txIndex);
@@ -138,6 +149,7 @@ contract MultiSigWallet {
 
         emit RevokeConfirmation(msg.sender, _txIndex);
     }
+
 
     function getOwners() public view returns (address[] memory) {
         return owners;
@@ -163,11 +175,14 @@ contract MultiSigWallet {
         Transaction storage transaction = transactions[_txIndex];
 
         return (
-            transaction.to,
+            transaction.target,
             transaction.value,
             transaction.data,
             transaction.executed,
             transaction.numConfirmations
         );
     }
+
+    //update owner
+    
 }
