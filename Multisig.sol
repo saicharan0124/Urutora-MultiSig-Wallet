@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
+import "@openzeppelin/contracts/utils/Counters.sol";
+ 
+
 contract MultiSigWallet {
     event Deposit(address indexed sender, uint amount, uint balance);
     event SubmitTransaction(
@@ -23,22 +26,33 @@ contract MultiSigWallet {
         uint value;
         string func ;
         bytes data ; 
+        string note;
         bool executed;
         uint numConfirmations;
     }
 
     // mapping from tx index => owner => bool
     mapping(uint => mapping(address => bool)) public isConfirmed;
+    using Counters for Counters.Counter;
+    Counters.Counter private Txindex;
 
-    Transaction[] public transactions;
+    //mapping transaction to transaction index 
+    mapping(uint => Transaction) public transactions;
+
+    // Transaction[] public transactions;
 
     modifier onlyOwner() {
         require(isOwner[msg.sender], "not owner");
         _;
     }
 
-    modifier txExists(uint _txIndex) {
-        require(_txIndex < transactions.length, "tx does not exist");
+    // modifier txExists(uint _txIndex) {
+    //     require(_txIndex < transactions.length, "tx does not exist");
+    //     _;
+    // }
+    
+      modifier txExists(uint _txIndex) {
+        require(transactions[_txIndex].target==address(0), "tx does not exist");
         _;
     }
 
@@ -81,26 +95,41 @@ contract MultiSigWallet {
         address _target,
         uint _value,
        string calldata _func,
-        bytes calldata _data
+        bytes calldata _data,
+        string calldata _note
     ) public onlyOwner {
-        uint txIndex = transactions.length;
-        transactions.push(
-            Transaction({
-                target: _target,
+        // uint txIndex = transactions.length;
+        // transactions.push(
+        //     Transaction({
+        //         target: _target,
+        //         value: _value,
+        //         func : _func,
+        //         data: _data,
+        //         executed: false,
+        //         numConfirmations: 0
+        //     })
+        // );
+
+        transactions[Txindex.current()]= Transaction({
+             target: _target,
                 value: _value,
                 func : _func,
                 data: _data,
+                note:_note,
                 executed: false,
                 numConfirmations: 0
-            })
-        );
 
-        emit SubmitTransaction(msg.sender, txIndex, _target, _value, _data);
+        });
+
+        Txindex.increment();
+
+        emit SubmitTransaction(msg.sender, Txindex.current(), _target, _value, _data);
     }
 
     function confirmTransaction(
         uint _txIndex
     ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
+        // require(transactions.length<11,"you have exceeded your transaction limit ");
         require(isConfirmed[_txIndex][msg.sender] = false,"aldready confirmed by the user");
         Transaction storage transaction = transactions[_txIndex];
         transaction.numConfirmations += 1;
@@ -149,15 +178,13 @@ contract MultiSigWallet {
 
         emit RevokeConfirmation(msg.sender, _txIndex);
     }
+   
 
 
     function getOwners() public view returns (address[] memory) {
         return owners;
     }
 
-    function getTransactionCount() public view returns (uint) {
-        return transactions.length;
-    }
 
     function getTransaction(
         uint _txIndex
@@ -165,9 +192,11 @@ contract MultiSigWallet {
         public
         view
         returns (
-            address to,
+            address target,
             uint value,
+            string memory _func,
             bytes memory data,
+            string memory note,
             bool executed,
             uint numConfirmations
         )
@@ -177,12 +206,15 @@ contract MultiSigWallet {
         return (
             transaction.target,
             transaction.value,
+            transaction.func,
             transaction.data,
+            transaction.note,
             transaction.executed,
             transaction.numConfirmations
         );
     }
+   
 
-    //update owner
+   
     
 }
