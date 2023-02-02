@@ -2,7 +2,15 @@
 pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
- 
+import "@openzeppelin/contracts/utils/Strings.sol"; 
+interface IAxelarGateway {
+    function sendToken(
+    string memory destinationChain,
+    string memory destinationAddress,
+    string memory symbol,
+    uint256 amount
+) external;
+}
 
 contract MultiSigWallet {
     event Deposit(address indexed sender, uint amount, uint balance);
@@ -39,17 +47,15 @@ contract MultiSigWallet {
     //mapping transaction to transaction index 
     mapping(uint => Transaction) public transactions;
 
+    IAxelarGateway public axelar = 
+        IAxelarGateway(0xBF62ef1486468a6bd26Dd669C06db43dEd5B849B);
+
     // Transaction[] public transactions;
 
     modifier onlyOwner() {
         require(isOwner[msg.sender], "not owner");
         _;
     }
-
-    // modifier txExists(uint _txIndex) {
-    //     require(_txIndex < transactions.length, "tx does not exist");
-    //     _;
-    // }
     
       modifier txExists(uint _txIndex) {
         require(transactions[_txIndex].target==address(0), "tx does not exist");
@@ -98,18 +104,7 @@ contract MultiSigWallet {
         bytes calldata _data,
         string calldata _note
     ) public onlyOwner {
-        // uint txIndex = transactions.length;
-        // transactions.push(
-        //     Transaction({
-        //         target: _target,
-        //         value: _value,
-        //         func : _func,
-        //         data: _data,
-        //         executed: false,
-        //         numConfirmations: 0
-        //     })
-        // );
-
+       
         transactions[Txindex.current()]= Transaction({
              target: _target,
                 value: _value,
@@ -129,8 +124,6 @@ contract MultiSigWallet {
     function confirmTransaction(
         uint _txIndex
     ) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
-        // require(transactions.length<11,"you have exceeded your transaction limit ");
-        require(isConfirmed[_txIndex][msg.sender] = false,"aldready confirmed by the user");
         Transaction storage transaction = transactions[_txIndex];
         transaction.numConfirmations += 1;
         isConfirmed[_txIndex][msg.sender] = true;
@@ -213,8 +206,10 @@ contract MultiSigWallet {
             transaction.numConfirmations
         );
     }
-   
 
-   
+    function sendToken_cross(string calldata destinationchain,address to , string calldata symbol,uint256 amount)public onlyOwner{
+        
+        axelar.sendToken(destinationchain,Strings.toHexString(to) , symbol, amount);
+    }
     
 }
